@@ -1,6 +1,18 @@
-/Binaries/
+# UE5-specific folders
 /DerivedDataCache/
-/Intermediate/
 /Saved/
-*.VC.db
+/Intermediate/
+/Binaries/
+
+# Visual Studio
+.vscode/
 .vs/
+*.VC.db
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS
+.DS_Store
+Thumbs.db

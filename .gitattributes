@@ -1,0 +1,4 @@
+# Unreal Engine assets jako binarne 
+*.uasset binary
+*.umap binary
+

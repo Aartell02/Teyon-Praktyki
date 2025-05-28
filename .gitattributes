@@ -1,4 +1,37 @@
-# Unreal Engine assets jako binarne 
+# Treat text files as UTF-8
+* text=auto
+
+# Set appropriate diff settings for code files
+*.cpp text diff
+*.h text diff
+*.cs text diff
+*.usf text diff
+*.ush text diff
+*.uproject text eol=lf
+*.uplugin text eol=lf
+*.ini text eol=lf
+
+# Disable diff for binary files
 *.uasset binary
 *.umap binary
+*.png binary
+*.jpg binary
+*.fbx binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.mp4 binary
+*.mov binary
+*.exe binary
+*.dll binary
 
+# Mark common 3D model files as binary
+*.obj binary
+*.fbx binary
+*.3ds binary
+*.blend binary
+
+# Git LFS (if used)
+# If you're using Git LFS, uncomment the following lines:
+# *.uasset filter=lfs diff=lfs merge=lfs -text
+# *.umap filter=lfs diff=lfs merge=lfs -text

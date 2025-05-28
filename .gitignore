@@ -1,18 +1,59 @@
-# UE5-specific folders
-/DerivedDataCache/
-/Saved/
-/Intermediate/
-/Binaries/
-
-# Visual Studio
+# Ignore all binaries and intermediate files
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
 .vscode/
-.vs/
-*.VC.db
+
+# Ignore user-specific project files
 *.suo
 *.user
 *.userosscache
-*.sln.docstates
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+*.log
 
-# OS
+# Ignore temporary files
+*.tmp
+*.bak
+*.orig
+*.swp
+
+# Ignore generated project files
+*.xcodeproj
+*.xcworkspace
+*.xcconfig
+*.DS_Store
+*.idea/
+.vs/
+*.VC.db
+
+# Ignore compiled assets
+*.pdb
+*.obj
+*.exe
+*.dll
+*.app
+*.lib
+
+# Ignore Unreal Build Tool files
+*.target
+*.modules
+*.generated.*
+*.gen.cpp
+*.gen.h
+
+# Ignore Mac OS metadata
 .DS_Store
+
+# Ignore Windows thumbnail files
 Thumbs.db
+
+# Ignore crash reports
+*.dmp
+*.crash
+
+# Ignore backup config files
+*.ini~

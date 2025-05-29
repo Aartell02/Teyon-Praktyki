@@ -21,6 +21,7 @@ AVehicleBase::AVehicleBase()
     // Load physics asset
     static UPhysicsAsset* PhysicsAsset = LoadObject<UPhysicsAsset>(nullptr, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SK_Porsche_911_GT3-R_PhysicsAsset.SK_Porsche_911_GT3-R_PhysicsAsset"));
     if (PhysicsAsset) Chassis->SetPhysicsAsset(PhysicsAsset);
+    Chassis->SetSimulatePhysics(true);
     SetRootComponent(Chassis);
     UPhysicsAsset* LoadedPhysicsAsset = LoadObject<UPhysicsAsset>(nullptr, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SK_Porsche_911_GT3-R_PhysicsAsset.SK_Porsche_911_GT3-R_PhysicsAsset"));
     Chassis->SetPhysicsAsset(LoadedPhysicsAsset);

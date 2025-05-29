@@ -2,221 +2,174 @@
 
 #include "VehicleBase.h"
 #include "Components/InputComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Logging/LogMacros.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "PhysicsEngine/PhysicsAsset.h"
+#include "Logging/LogMacros.h"
+
 
 AVehicleBase::AVehicleBase()
 {
     PrimaryActorTick.bCanEverTick = true;
+    AutoPossessPlayer = EAutoReceiveInput::Player0;
 
-    // Chassis root enable physics
     Chassis = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Chassis"));
-    check(Chassis);
-    SetRootComponent(Chassis);
-    Chassis->SetSimulatePhysics(true);
-
-    // Bone merge
-    Main_Body = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Main_Body"));
-    Main_Body->SetupAttachment(Chassis, TEXT("Body"));
-
-    FL_Wheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FL_Wheel"));
-    FL_Wheel->SetupAttachment(Chassis, TEXT("wheel_front_left_spin"));
-
-    FR_Wheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FR_Wheel"));
-    FR_Wheel->SetupAttachment(Chassis, TEXT("wheel_front_right_spin"));
-
-    BL_Wheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BL_Wheel"));
-    BL_Wheel->SetupAttachment(Chassis, TEXT("wheel_back_left_spin"));
-
-    BR_Wheel = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BR_Wheel"));
-    BR_Wheel->SetupAttachment(Chassis, TEXT("wheel_back_right_spin"));
-
-    R_Boot = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("R_Boot"));
-    R_Boot->SetupAttachment(Chassis, TEXT("boot_rear"));
-
-    F_Bumper = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("F_Bumper"));
-    F_Bumper->SetupAttachment(Chassis, TEXT("bumper_front"));
-
-    R_Bumper = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("R_Bumper"));
-    R_Bumper->SetupAttachment(Chassis, TEXT("bumper_rear"));
-
-    B_Diffuser = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("B_Diffuser"));
-    B_Diffuser->SetupAttachment(Chassis, TEXT("diffuser_back"));
-
-    L_Door = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("L_Door"));
-    L_Door->SetupAttachment(Chassis, TEXT("door_left"));
-
-    R_Door = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("R_Door"));
-    R_Door->SetupAttachment(Chassis, TEXT("door_right"));
-
-    L_Fender = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("L_Fender"));
-    L_Fender->SetupAttachment(Chassis, TEXT("fender_left"));
-
-    R_Fender = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("R_Fender"));
-    R_Fender->SetupAttachment(Chassis, TEXT("fender_right"));
-
-    F_Hood = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("F_Hood"));
-    F_Hood->SetupAttachment(Chassis, TEXT("hood_front"));
-
-    B_Spoiler = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("B_Spoiler"));
-    B_Spoiler->SetupAttachment(Chassis, TEXT("spoiler_back"));
-
-    L_Wing_Mirror = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("L_Wing_Mirror"));
-    L_Wing_Mirror->SetupAttachment(Chassis, TEXT("window_left"));
-
-    R_Wing_Mirror = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("R_Wing_Mirror"));
-    R_Wing_Mirror->SetupAttachment(Chassis, TEXT("window_right"));
-    
     // Mesh load
     static ConstructorHelpers::FObjectFinder<USkeletalMesh> ChassisMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SK_Porsche_911_GT3-R.SK_Porsche_911_GT3-R"));
-    if (ChassisMeshAsset.Succeeded())
+    if (ChassisMeshAsset.Succeeded()) Chassis->SetSkeletalMesh(ChassisMeshAsset.Object);
+
+    // Load physics asset
+    static UPhysicsAsset* PhysicsAsset = LoadObject<UPhysicsAsset>(nullptr, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SK_Porsche_911_GT3-R_PhysicsAsset.SK_Porsche_911_GT3-R_PhysicsAsset"));
+    if (PhysicsAsset) Chassis->SetPhysicsAsset(PhysicsAsset);
+    SetRootComponent(Chassis);
+    UPhysicsAsset* LoadedPhysicsAsset = LoadObject<UPhysicsAsset>(nullptr, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SK_Porsche_911_GT3-R_PhysicsAsset.SK_Porsche_911_GT3-R_PhysicsAsset"));
+    Chassis->SetPhysicsAsset(LoadedPhysicsAsset);
+
+    if (Chassis->IsSimulatingPhysics())
     {
-        Chassis->SetSkeletalMesh(ChassisMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Chassis skeletal mesh loaded successfully"));
+        UE_LOG(LogTemp, Warning, TEXT("Simulating physics is enabled."));
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to load chassis skeletal mesh"));
+        UE_LOG(LogTemp, Warning, TEXT("Simulating physics is NOT enabled."));
     }
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> FrontWheelMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Wheel.SM_Porsche_911_GT3_R_Front_Wheel"));
-    if (FrontWheelMeshAsset.Succeeded())
-    {
-        UE_LOG(LogTemp, Log, TEXT("front wheel load success"));
-        FL_Wheel->SetStaticMesh(FrontWheelMeshAsset.Object);
-        FR_Wheel->SetStaticMesh(FrontWheelMeshAsset.Object);
-    }
-    else UE_LOG(LogTemp, Log, TEXT("front wheel load error"));
+    
+    // Spring arm (ramiê kamery)
+    SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+    SpringArm->SetupAttachment(Chassis);
+    SpringArm->SocketOffset = FVector(0.f, 0.f, 200.f);
+    SpringArm->SetRelativeRotation(FRotator(-30.f, 0.f, 0.f)); 
+    SpringArm->TargetArmLength = 350.0f;
+    SpringArm->bEnableCameraLag = true;
+    SpringArm->CameraLagSpeed = 5.0f;
+    SpringArm->bUsePawnControlRotation = true;
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> RearWheelMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Wheel.SM_Porsche_911_GT3_R_Rear_Wheel"));
-    if (RearWheelMeshAsset.Succeeded())
-    {
-        UE_LOG(LogTemp, Log, TEXT("rear wheel load success"));
-        BL_Wheel->SetStaticMesh(RearWheelMeshAsset.Object);
-        BR_Wheel->SetStaticMesh(RearWheelMeshAsset.Object);
-    }
-    else UE_LOG(LogTemp, Log, TEXT("rear wheel load error"));
+    // Kamera
+    Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+    Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
+    Camera->bUsePawnControlRotation = false;
+    // Bone merge
+    //SK_Porsche_911_Gt3_R1
+#define CREATE_AND_ATTACH(name, socket) \
+    name = CreateDefaultSubobject<UStaticMeshComponent>(TEXT(#name)); \
+    name->AttachToComponent(Chassis, FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT(socket));
+    // Grouped car components
+    CREATE_AND_ATTACH(Main_Body, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Seat, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Interior, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Window, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Cockpit_Console, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Engine_Components, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Net, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Pedal_Brake, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Pedal_Acceleration, "SK_Porsche_911_Gt3_R1")
+    CREATE_AND_ATTACH(Steering_Wheel, "SK_Porsche_911_Gt3_R1")
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> MainBodyMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Main_Body.SM_Porsche_911_GT3_R_Main_Body"));
+    CREATE_AND_ATTACH(FL_Wheel, "wheel_front_left_spin")
+    CREATE_AND_ATTACH(FR_Wheel, "wheel_front_right_spin")
+    CREATE_AND_ATTACH(BL_Wheel, "wheel_back_left_spin")
+    CREATE_AND_ATTACH(BR_Wheel, "wheel_back_right_spin")
 
-    if (MainBodyMeshAsset.Succeeded())
-    {
-        Main_Body->SetStaticMesh(MainBodyMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Main body mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load main body mesh"));
+    CREATE_AND_ATTACH(FL_Brake_Disc, "wheel_front_left_spin")
+    CREATE_AND_ATTACH(FR_Brake_Disc, "wheel_front_right_spin")
+    CREATE_AND_ATTACH(BL_Brake_Disc, "wheel_back_left_spin")
+    CREATE_AND_ATTACH(BR_Brake_Disc, "wheel_back_right_spin")
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> RearBootMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Boot.SM_Porsche_911_GT3_R_Rear_Boot"));
-    if (RearBootMeshAsset.Succeeded())
-    {
-        R_Boot->SetStaticMesh(RearBootMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Rear boot mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load rear boot mesh"));
+    CREATE_AND_ATTACH(R_Boot, "boot_rear")
+    CREATE_AND_ATTACH(F_Bumper, "bumper_front")
+    CREATE_AND_ATTACH(R_Bumper, "bumper_rear")
+    CREATE_AND_ATTACH(B_Diffuser, "diffuser_back")
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> FrontBumperMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Bumper.SM_Porsche_911_GT3_R_Front_Bumper"));
-    if (FrontBumperMeshAsset.Succeeded())
-    {
-        F_Bumper->SetStaticMesh(FrontBumperMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Front bumper mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load front bumper mesh"));
+    CREATE_AND_ATTACH(L_Door, "door_left")
+    CREATE_AND_ATTACH(R_Door, "door_right")
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> RearBumperMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Bumper.SM_Porsche_911_GT3_R_Rear_Bumper"));
-    if (RearBumperMeshAsset.Succeeded())
-    {
-        R_Bumper->SetStaticMesh(RearBumperMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Rear bumper mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load rear bumper mesh"));
+    CREATE_AND_ATTACH(L_Fender, "fender_left")
+    CREATE_AND_ATTACH(R_Fender, "fender_right")
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> DiffuserMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Diffuser.SM_Porsche_911_GT3_R_Rear_Diffuser"));
-    if (DiffuserMeshAsset.Succeeded())
-    {
-        B_Diffuser->SetStaticMesh(DiffuserMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Diffuser mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load diffuser mesh"));
+    CREATE_AND_ATTACH(F_Hood, "hood_front")
+    CREATE_AND_ATTACH(B_Spoiler, "spoiler_back")
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> DoorLeftMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Door_Left.SM_Porsche_911_GT3_R_Door_Left"));
-    if (DoorLeftMeshAsset.Succeeded())
-    {
-        L_Door->SetStaticMesh(DoorLeftMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Left door mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load left door mesh"));
+    CREATE_AND_ATTACH(L_Wing_Mirror, "wing_mirror_left")
+    CREATE_AND_ATTACH(R_Wing_Mirror, "wing_mirror_right")
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> DoorRightMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Door_Right.SM_Porsche_911_GT3_R_Door_Right"));
-    if (DoorRightMeshAsset.Succeeded())
-    {
-        R_Door->SetStaticMesh(DoorRightMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Right door mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load right door mesh"));
+#undef CREATE_AND_ATTACH
+   
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> FenderLeftMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Fender_Left.SM_Porsche_911_GT3_R_Fender_Left"));
-    if (FenderLeftMeshAsset.Succeeded())
-    {
-        L_Fender->SetStaticMesh(FenderLeftMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Left fender mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load left fender mesh"));
+    auto LoadMesh = [](UStaticMeshComponent* Comp, const TCHAR* Path)
+        {
+            ConstructorHelpers::FObjectFinder<UStaticMesh> MeshAsset(Path);
+            if (MeshAsset.Succeeded())
+                Comp->SetStaticMesh(MeshAsset.Object);
+        };
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> FenderRightMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Fender_Right.SM_Porsche_911_GT3_R_Fender_Right"));
-    if (FenderRightMeshAsset.Succeeded())
-    {
-        R_Fender->SetStaticMesh(FenderRightMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Right fender mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load right fender mesh"));
-
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> HoodFrontMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Hood.SM_Porsche_911_GT3_R_Front_Hood"));
-    if (HoodFrontMeshAsset.Succeeded())
-    {
-        F_Hood->SetStaticMesh(HoodFrontMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Front hood mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load front hood mesh"));
-
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> SpoilerBackMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Spoiler.SM_Porsche_911_GT3_R_Rear_Spoiler"));
-    if (SpoilerBackMeshAsset.Succeeded())
-    {
-        B_Spoiler->SetStaticMesh(SpoilerBackMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Spoiler mesh loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load spoiler mesh"));
-
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> MirrorMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Wing_Mirror_Left.SM_Porsche_911_GT3_R_Wing_Mirror_Left"));
-    if (MirrorMeshAsset.Succeeded())
-    {
-        L_Wing_Mirror->SetStaticMesh(MirrorMeshAsset.Object);
-        R_Wing_Mirror->SetStaticMesh(MirrorMeshAsset.Object);
-        UE_LOG(LogTemp, Log, TEXT("Mirror meshes loaded successfully"));
-    }
-    else UE_LOG(LogTemp, Warning, TEXT("Failed to load mirror mesh"));
-
+    LoadMesh(Main_Body, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Main_Body.SM_Porsche_911_GT3_R_Main_Body"));
+    LoadMesh(Seat, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Seat_Net_Clamps.SM_Porsche_911_GT3_R_Seat_Net_Clamps"));
+    Seat->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LoadMesh(Interior, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Interior.SM_Porsche_911_GT3_R_Interior"));
+    Interior->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    LoadMesh(Window, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Exterior_Interior_Windows.SM_Porsche_911_GT3_R_Exterior_Interior_Windows"));
+    LoadMesh(Cockpit_Console, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Cockpit_Console.SM_Porsche_911_GT3_R_Cockpit_Console"));
+    LoadMesh(Engine_Components, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Engine_Components.SM_Porsche_911_GT3_R_Engine_Components"));
+    LoadMesh(Net, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Net.SM_Porsche_911_GT3_R_Net"));
+    LoadMesh(Pedal_Brake, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Pedal_Brake.SM_Porsche_911_GT3_R_Pedal_Brake"));
+    Pedal_Brake->AttachToComponent(Interior, FAttachmentTransformRules::SnapToTargetNotIncludingScale, "Pedal_brake");
+    LoadMesh(Pedal_Acceleration, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Pedal_Acceleration.SM_Porsche_911_GT3_R_Pedal_Acceleration"));
+    Pedal_Acceleration->AttachToComponent(Interior, FAttachmentTransformRules::SnapToTargetNotIncludingScale, "Pedal_acceleration");
+    LoadMesh(Steering_Wheel, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Steering_Wheel.SM_Porsche_911_GT3_R_Steering_Wheel"));
+    Steering_Wheel->AttachToComponent(Interior, FAttachmentTransformRules::SnapToTargetNotIncludingScale, "SteeringWheel");
+    LoadMesh(FL_Wheel, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Wheel.SM_Porsche_911_GT3_R_Front_Wheel"));
+    LoadMesh(FR_Wheel, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Wheel.SM_Porsche_911_GT3_R_Front_Wheel"));
+    FR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+    LoadMesh(BL_Wheel, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Wheel.SM_Porsche_911_GT3_R_Rear_Wheel"));
+    LoadMesh(BR_Wheel, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Wheel.SM_Porsche_911_GT3_R_Rear_Wheel"));
+    BR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+    LoadMesh(FL_Brake_Disc, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Brake_Disc.SM_Porsche_911_GT3_R_Front_Brake_Disc"));
+    LoadMesh(FR_Brake_Disc, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Brake_Disc.SM_Porsche_911_GT3_R_Front_Brake_Disc"));
+    FR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+    LoadMesh(BL_Brake_Disc, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Brake_Disc.SM_Porsche_911_GT3_R_Rear_Brake_Disc"));
+    LoadMesh(BR_Brake_Disc, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Brake_Disc.SM_Porsche_911_GT3_R_Rear_Brake_Disc"));
+    BR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+    LoadMesh(R_Boot, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Boot.SM_Porsche_911_GT3_R_Rear_Boot"));
+    LoadMesh(F_Bumper, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Bumper.SM_Porsche_911_GT3_R_Front_Bumper"));
+    LoadMesh(R_Bumper, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Bumper.SM_Porsche_911_GT3_R_Rear_Bumper"));
+    LoadMesh(B_Diffuser, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Diffuser.SM_Porsche_911_GT3_R_Rear_Diffuser"));
+    LoadMesh(L_Door, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Door_Left.SM_Porsche_911_GT3_R_Door_Left"));
+    LoadMesh(R_Door, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Door_Right.SM_Porsche_911_GT3_R_Door_Right"));
+    LoadMesh(L_Fender, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Fender_Left.SM_Porsche_911_GT3_R_Fender_Left"));
+    LoadMesh(R_Fender, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Fender_Right.SM_Porsche_911_GT3_R_Fender_Right"));
+    LoadMesh(F_Hood, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Front_Hood.SM_Porsche_911_GT3_R_Front_Hood"));
+    LoadMesh(B_Spoiler, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Spoiler.SM_Porsche_911_GT3_R_Rear_Spoiler"));
+    LoadMesh(L_Wing_Mirror, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Wing_Mirror_Left.SM_Porsche_911_GT3_R_Wing_Mirror_Left"));
+    LoadMesh(R_Wing_Mirror, TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Wing_Mirror_Right.SM_Porsche_911_GT3_R_Wing_Mirror_Right"));
     // === Mesh load end ===
 
-    /*
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> RearBootMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Rear_Boot.SM_Porsche_911_GT3_R_Rear_Boot"));
-    if (RearBootMeshAsset.Succeeded())
-    {
-        UE_LOG(LogTemp, Log, TEXT("rear boot load success"));
-        R_Boot->SetStaticMesh(RearBootMeshAsset.Object);
-    }
-    else UE_LOG(LogTemp, Log, TEXT("rear boot load error"));
-    */
-
-    
     MovementInput = FVector::ZeroVector;
     TurnInput = 0.f;
-    SteeringAngle = 0.f;
-    WheelSpinAngle = 0.f;
+}
+
+void AVehicleBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+    Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+    PlayerInputComponent->BindAxis("Throttle", this, &AVehicleBase::Throttle);
+    PlayerInputComponent->BindAxis("Steer", this, &AVehicleBase::Steer);
 }
 
 void AVehicleBase::BeginPlay()
 {
     Super::BeginPlay();
+
+    Chassis->SetSimulatePhysics(true);
+    Chassis->SetEnableGravity(true);
+    Chassis->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    Chassis->SetCollisionObjectType(ECollisionChannel::ECC_PhysicsBody);
+    Chassis->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Block);
+    Chassis->SetMassOverrideInKg(NAME_None, 1500.f);
+    UE_LOG(LogTemp, Warning, TEXT("Chassis IsSimulatingPhysics: %s"), Chassis->IsSimulatingPhysics() ? TEXT("TRUE") : TEXT("FALSE"));
+    UE_LOG(LogTemp, Warning, TEXT("Chassis Has Valid Physics Asset: %s"), Chassis->GetPhysicsAsset() ? TEXT("TRUE") : TEXT("FALSE"));
+
+    Chassis->SetAllPhysicsLinearVelocity(FVector::ZeroVector);
+    Chassis->SetAllPhysicsAngularVelocityInRadians(FVector::ZeroVector);
 }
 
 void AVehicleBase::Tick(float DeltaTime)
@@ -225,34 +178,25 @@ void AVehicleBase::Tick(float DeltaTime)
 
     if (!MovementInput.IsNearlyZero())
     {
-        FVector Force = Chassis->GetForwardVector() * MovementInput.X * 100000.f;
-        Chassis->AddForce(Force);
+        FVector ThrottleForce = Chassis->GetForwardVector() * MovementInput.X * ThrottleForce * DeltaTime;
+        Chassis->AddForce(ThrottleForce);
     }
 
     if (FMath::Abs(TurnInput) > 0.1f)
     {
-        FVector Torque = FVector(0.f, 0.f, 1.f) * TurnInput * 100000.f;
-        Chassis->AddTorqueInRadians(Torque);
+        FVector SteeringTorque = FVector(0.f, 0.f, 1.f) * TurnInput * SteeringTorque * DeltaTime;
+        Chassis->AddTorqueInRadians(SteeringTorque);
     }
-
-    SteeringAngle = TurnInput * 30.f;
-    WheelSpinAngle += MovementInput.X * DeltaTime * 500.f;
 }
 
-void AVehicleBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void AVehicleBase::Throttle(float Value)
 {
-    Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-    PlayerInputComponent->BindAxis("MoveForward", this, &AVehicleBase::MoveForward);
-    PlayerInputComponent->BindAxis("TurnRight", this, &AVehicleBase::TurnRight);
+    // Apply force to simulate throttle
+    MovementInput.X = FMath::Clamp(Value, -1.0f, 1.0f);
 }
 
-void AVehicleBase::MoveForward(float Value)
+void AVehicleBase::Steer(float Value)
 {
-    MovementInput.X = FMath::Clamp(Value, -1.f, 1.f);
-}
-
-void AVehicleBase::TurnRight(float Value)
-{
-    TurnInput = FMath::Clamp(Value, -1.f, 1.f);
+    // Apply torque to simulate steering
+    TurnInput = FMath::Clamp(Value, -1.0f, 1.0f);
 }

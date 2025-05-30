@@ -31,6 +31,9 @@ public:
     // Input handlers
     void Throttle(float Value);
     void Steer(float Value);
+    void ApplyFriction(float DeltaTime);
+    void LimitWheelRotationDirection();
+    UStaticMeshComponent* CreatePart(USkeletalMeshComponent* Name, const FString& Socket, const FString& AssetPath);
     
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     USpringArmComponent* SpringArm;
@@ -44,10 +47,13 @@ public:
 
     // Parametry fizyki
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
-    float MoveForce = 100000.f;
+    float ThrottleForceStrength = 400000.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
-    float TurnTorque = 100000.f;
+    float SteeringTorqueStrength = 8000000.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
+    float DriftFactor = 1.f;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle")
     USkeletalMeshComponent* Chassis;

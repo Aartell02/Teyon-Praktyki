@@ -22,6 +22,8 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+    float CurrentSteeringAngle = 0.0f; // in degrees
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -31,9 +33,12 @@ public:
     // Input handlers
     void Throttle(float Value);
     void Steer(float Value);
-    void ApplyFriction(float DeltaTime);
-    void LimitWheelRotationDirection();
-    UStaticMeshComponent* CreatePart(USkeletalMeshComponent* Name, const FString& Socket, const FString& AssetPath);
+    void ApplyFriction();
+    void ApplyBrakeForce();
+    void ReleaseHandbrake();
+    void ActivateHandbrake();
+    void SetBrake(float DeltaTime);
+
     
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     USpringArmComponent* SpringArm;
@@ -44,16 +49,31 @@ public:
     // Input
     FVector MovementInput;
     float TurnInput;
+    float SteeringAngle = 0.0f;
+    float MaxSteeringAngle = 30.0f;
+    float SteeringReturnSpeed = 150.0f;
 
     // Parametry fizyki
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
     float ThrottleForceStrength = 400000.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
-    float SteeringTorqueStrength = 8000000.f;
+    float SteeringTorqueStrength = 1000000.f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    float FrontAxleOffset = 100.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
-    float DriftFactor = 1.f;
+    float DriftFactor = 0.05f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
+    float BrakeInput = 0.8f;  
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Physics")
+    float BrakeForce = 500000.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
+    bool bHandbrake = false;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle")
     USkeletalMeshComponent* Chassis;
@@ -87,6 +107,12 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle")
     UStaticMeshComponent* Steering_Wheel;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle|Wheels")
+    USceneComponent* FL_Wheel_Turn;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle|Wheels")
+    USceneComponent* FR_Wheel_Turn;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle")
     UStaticMeshComponent* FL_Wheel;

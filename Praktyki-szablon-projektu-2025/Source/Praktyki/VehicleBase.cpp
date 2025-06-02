@@ -1,4 +1,4 @@
-// Copyright 2025 Teyon. All Rights Reserved.
+ï»¿// Copyright 2025 Teyon. All Rights Reserved.
 #include "VehicleBase.h"
 #include "Components/InputComponent.h"
 #include "Camera/CameraComponent.h"
@@ -9,7 +9,6 @@
 AVehicleBase::AVehicleBase()
 {
     PrimaryActorTick.bCanEverTick = true;
-    AutoPossessPlayer = EAutoReceiveInput::Player0;
 
     Chassis = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Chassis"));
     RootComponent = Chassis;
@@ -54,6 +53,13 @@ AVehicleBase::AVehicleBase()
     MovementInput = FVector::ZeroVector;
     TurnInput = 0.f;
     DriftFactor = 0.9f;
+
+    FL_Wheel_Turn = CreateDefaultSubobject<USceneComponent>(TEXT("FL_Wheel_Turn"));
+    FR_Wheel_Turn = CreateDefaultSubobject<USceneComponent>(TEXT("FR_Wheel_Turn"));
+
+    FL_Wheel_Turn->SetupAttachment(Chassis, TEXT("wheel_front_left_turn"));
+    FR_Wheel_Turn->SetupAttachment(Chassis, TEXT("wheel_front_right_turn"));
+
 
 #define CREATE_AND_ATTACH(name, socket, path, root) \
     name = CreateDefaultSubobject<UStaticMeshComponent>(TEXT(#name)); \
@@ -105,14 +111,11 @@ AVehicleBase::AVehicleBase()
         CREATE_AND_ATTACH(R_Wing_Mirror, "wing_mirror_right", TEXT("/Game/Vehicles/Porsche_911_GT3_R/SM_Porsche_911_GT3_R_Wing_Mirror_Right.SM_Porsche_911_GT3_R_Wing_Mirror_Right"), Chassis)
 
 #undef CREATE_AND_ATTACH
-    BL_Wheel->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); 
-    FL_Wheel->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-    FR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
-    FR_Wheel->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-    BR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
-    BR_Wheel->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-    FR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
-    BR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+
+        FR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+        FR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+        BR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+        BR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
 
 }
 
@@ -121,6 +124,10 @@ void AVehicleBase::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
     Super::SetupPlayerInputComponent(PlayerInputComponent);
     PlayerInputComponent->BindAxis("Throttle", this, &AVehicleBase::Throttle);
     PlayerInputComponent->BindAxis("Steer", this, &AVehicleBase::Steer);
+    PlayerInputComponent->BindAxis("Brake", this, &AVehicleBase::SetBrake);
+    PlayerInputComponent->BindAction("Handbrake", IE_Pressed, this, &AVehicleBase::ActivateHandbrake);
+    PlayerInputComponent->BindAction("Handbrake", IE_Released, this, &AVehicleBase::ReleaseHandbrake);
+
 }
 
 void AVehicleBase::BeginPlay()
@@ -144,14 +151,22 @@ void AVehicleBase::Tick(float DeltaTime)
             FVector Force = Chassis->GetForwardVector() * MovementInput.X * ThrottleForceStrength;
             Chassis->AddForce(Force);
         }
-
+        if (FMath::IsNearlyZero(TurnInput, 0.01f)) // a new raw input we will store from Steer(float)
+        {
+            TurnInput = FMath::FInterpTo(TurnInput, 0.0f, DeltaTime, SteeringReturnSpeed);
+            CurrentSteeringAngle = FMath::FInterpTo(CurrentSteeringAngle, 0.0f, DeltaTime, 5.0f); // smooth return
+        }
         if (FMath::Abs(TurnInput) > KINDA_SMALL_NUMBER)
         {
+            CurrentSteeringAngle = FMath::Clamp(DeltaTime, -1.0f, 1.0f) * MaxSteeringAngle;
+
             FVector Torque = FVector(0.f, 0.f, TurnInput * SteeringTorqueStrength);
             Chassis->AddTorqueInRadians(Torque);
         }
-        ApplyFriction(DeltaTime);
 
+
+        ApplyFriction();
+        ApplyBrakeForce();
     }
 }
 
@@ -162,58 +177,93 @@ void AVehicleBase::Throttle(float Value)
 
 void AVehicleBase::Steer(float Value)
 {
-    TurnInput = FMath::Clamp(Value, -1.0f, 1.0f);
+    TurnInput = Value; 
+
+    float TargetAngle = FMath::Clamp(Value * MaxSteeringAngle, -MaxSteeringAngle, MaxSteeringAngle);
+
+    TurnInput = TargetAngle;
 }
-void AVehicleBase::ApplyFriction(float DeltaTime)
+
+void AVehicleBase::SetBrake(float Value)
 {
-    /*
+    BrakeInput = FMath::Clamp(Value, 0.f, 1.f);
+}
+
+void AVehicleBase::ActivateHandbrake()
+{
+    bHandbrake = true;
+}
+
+void AVehicleBase::ReleaseHandbrake()
+{
+    bHandbrake = false;
+}
+
+void AVehicleBase::ApplyFriction()
+{
+    const float FrictionCoef = 1.0f;
+    const float CorneringStiffness = 80000.0f;
+    const float VelocityThreshold = 5.0f;
+    const float GravityCm = 980.0f;
+
+    float Mass = Chassis->GetMass();
     FVector Velocity = Chassis->GetPhysicsLinearVelocity();
     float Speed = Velocity.Size();
+    if (Speed < VelocityThreshold) return;
 
-    if (Speed < 1.0f)  // Jeœli ju¿ prawie stoi, nic nie rób
-    {
-        Chassis->SetPhysicsLinearVelocity(FVector::ZeroVector);
-        return;
-    }
-
-    // Si³a hamowania proporcjonalna do prêdkoœci
-    float FrictionCoefficient = 5000.0f;  // Dostosuj w zale¿noœci od masy/si³y
-    FVector FrictionForce = -Velocity.GetSafeNormal() * FrictionCoefficient;
-
-    Chassis->AddForce(FrictionForce);
-    FVector LateralVelocity = FVector::VectorPlaneProject(
-        Chassis->GetPhysicsLinearVelocity(),
-        Chassis->GetForwardVector()
-    );
-
-    FVector LateralFriction = -LateralVelocity * 50.f;  // Si³a tarcia bocznego
-    Chassis->AddForce(LateralFriction);*/
-    FVector Velocity = Chassis->GetPhysicsLinearVelocity();
-
+    // --- Chassis orientation ---
     FVector Forward = Chassis->GetForwardVector();
     FVector Right = Chassis->GetRightVector();
+    FVector Up = Chassis->GetUpVector();
 
-    FVector LateralVelocity = FVector::VectorPlaneProject(Velocity, Forward);
-    FVector ForwardVelocity = FVector::DotProduct(Velocity, Forward) * Forward;
+    // --- Rotate by current steering angle to get front wheel direction ---
+    float SteeringRad = FMath::DegreesToRadians(CurrentSteeringAngle);
+    FQuat SteerRotation = FQuat(Up, SteeringRad);
+    FVector FrontWheelForward = SteerRotation * Forward;
+    FVector FrontWheelRight = SteerRotation * Right;
 
-    FVector DriftForce = -LateralVelocity * (1.0f - DriftFactor) * 1000.0f;
-    FVector RollingResistance = -ForwardVelocity * 0.05f;
+    // --- Velocity at front axle ---
+    FVector FrontAxleLocation = Chassis->GetComponentLocation() + Forward * FrontAxleOffset;
+    FVector VelocityAtFront = Chassis->GetPhysicsLinearVelocityAtPoint(FrontAxleLocation);
 
-    Chassis->AddForce(DriftForce + RollingResistance);
+    float V_forward = FVector::DotProduct(VelocityAtFront, FrontWheelForward);
+    float V_lateral = FVector::DotProduct(VelocityAtFront, FrontWheelRight);
+    float SlipAngle = FMath::Atan2(V_lateral, V_forward);
+    SlipAngle = FMath::Clamp(SlipAngle, -FMath::DegreesToRadians(30.0f), FMath::DegreesToRadians(30.0f));
+
+
+    float F_lat_desired = -CorneringStiffness * SlipAngle;
+
+    float SpeedFactor = FMath::Clamp(Speed / 3000.0f, 0.0f, 1.0f);
+    F_lat_desired *= SpeedFactor;
+
+    float NormalForce = Mass * GravityCm;
+    float MaxLatForce = FrictionCoef * NormalForce;
+    F_lat_desired = FMath::Clamp(F_lat_desired, -MaxLatForce, MaxLatForce);
+
+
+    if (FMath::Abs(SlipAngle) > FMath::DegreesToRadians(1.0f)) {
+        FVector LateralForce = FrontWheelRight * F_lat_desired;
+        Chassis->AddForceAtLocation(LateralForce, FrontAxleLocation);
+    }
+    FVector AngularVel = Chassis->GetPhysicsAngularVelocityInDegrees();
+    FVector AngularDamp = -AngularVel * 0.2f; // Dampen 20% per frame
+    Chassis->AddTorqueInDegrees(AngularDamp * Chassis->GetMass());
 }
 
-void AVehicleBase::LimitWheelRotationDirection()
+
+void AVehicleBase::ApplyBrakeForce()
 {
-    // Example for a wheel component named FrontLeftWheel
-    if (!FL_Wheel) return;
+    if (!Chassis) return;
 
-    FVector AngularVelocity = FL_Wheel->GetPhysicsAngularVelocityInDegrees();
+    FVector Velocity = Chassis->GetPhysicsLinearVelocity();
+    FVector OpposingForce = -Velocity.GetSafeNormal() * BrakeForce * BrakeInput;
 
-    // Let's assume we want to lock the wheel to rotate forward only on the Y-axis (pitch)
-    if (AngularVelocity.Y < 0)
+    Chassis->AddForce(OpposingForce);
+
+    if (bHandbrake)
     {
-        FVector ClampedAngularVelocity = AngularVelocity;
-        ClampedAngularVelocity.Y = 0.f; // Prevent reverse rotation
-        FL_Wheel->SetPhysicsAngularVelocityInDegrees(ClampedAngularVelocity);
+        FVector HandbrakeForce = -Velocity.GetSafeNormal() * (BrakeForce * 2.0f);
+        Chassis->AddForce(HandbrakeForce);
     }
 }

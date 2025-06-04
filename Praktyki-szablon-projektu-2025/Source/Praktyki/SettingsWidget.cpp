@@ -54,7 +54,7 @@ int32 USettingsWidget::GetNumberOfLaps()
     {
         if (URaceGameInstance* MyGI = Cast<URaceGameInstance>(GI))
         {
-            return MyGI->NumberOfLaps;
+            return MyGI->GetNumberOfLaps();
         }
     }
     return 0;

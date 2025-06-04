@@ -1,16 +1,58 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
+// Copyright 2025 Teyon. All Rights Reserved.
 
 #include "PraktykiGameModeBase.h"
 #include "VehicleHUD.h" 
 #include "VehicleBase.h"
-#include "UObject/ConstructorHelpers.h"
-#include "Kismet/GameplayStatics.h"
+#include "RaceGameInstance.h"
+#include "GameFramework/PlayerController.h"
+#include "Logging/LogMacros.h"
 
-APraktykiGameModeBase::APraktykiGameModeBase() 
+APraktykiGameModeBase::APraktykiGameModeBase()
 {
 	HUDClass = AVehicleHUD::StaticClass();
 	DefaultPawnClass = AVehicleBase::StaticClass();
-
-	
+    PrimaryActorTick.bCanEverTick = true;
 }
+void APraktykiGameModeBase::BeginPlay()
+{
+    Super::BeginPlay();
+    const URaceGameInstance* GI = GetGameInstance<URaceGameInstance>();
+
+    NumberOfLaps = GI ? GI->NumberOfLaps : 3;
+    TotalCheckpoints = 6;
+}
+void APraktykiGameModeBase::Tick(float DeltaTime)
+{
+    if (!PlayerRaceData.bFinished)
+    {
+        PlayerRaceData.CurrentLapTime += DeltaTime;
+        PlayerRaceData.TotalRaceTime += DeltaTime;
+    }
+    
+}
+void APraktykiGameModeBase::OnPlayerHitCheckpoint(int32 CheckpointIndex)
+{
+    if (PlayerRaceData.bFinished) return;
+
+    if (CheckpointIndex == PlayerRaceData.NextCheckpoint)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("You hit checkpoint: %d"), PlayerRaceData.NextCheckpoint);
+        PlayerRaceData.NextCheckpoint++;
+        if (PlayerRaceData.NextCheckpoint >= TotalCheckpoints)
+        {
+            PlayerRaceData.NextCheckpoint = 0;
+            if(PlayerRaceData.CurrentLap < NumberOfLaps)PlayerRaceData.CurrentLap++;
+            else 
+            {
+                PlayerRaceData.bFinished = true;
+                UE_LOG(LogTemp, Warning, TEXT("Race finished! Total time: %.2f seconds"), PlayerRaceData.TotalRaceTime);
+            }
+            PlayerRaceData.CurrentLapTime = 0.f;
+        }
+    }
+}
+const FPlayerRaceData& APraktykiGameModeBase::GetRaceData() const
+{
+    return PlayerRaceData;
+}
+

@@ -2,3 +2,13 @@
 
 
 #include "RaceGameInstance.h"
+
+
+int32 URaceGameInstance::GetNumberOfLaps()
+{
+    return NumberOfLaps;
+}
+void URaceGameInstance::SetNumberOfLaps(int32 Number)
+{
+    NumberOfLaps = Number;
+}

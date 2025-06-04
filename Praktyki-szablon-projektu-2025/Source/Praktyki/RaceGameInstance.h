@@ -16,16 +16,12 @@ class PRAKTYKI_API URaceGameInstance : public UGameInstance
 
 public:
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game Settings")
-    float MaxGameTime = 300.f;
+
+    int32 GetNumberOfLaps();
+    void SetNumberOfLaps(int32 Number);
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 NumberOfLaps = 3;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    FString SelectedTrack;
-
-    UPROPERTY(BlueprintReadWrite, EditAnywhere)
-    int32 NumberOfAI = 5;
     
 };

@@ -1,4 +1,5 @@
 ﻿// Copyright 2025 Teyon. All Rights Reserved.
+
 #include "VehicleBase.h"
 #include "Components/InputComponent.h"
 #include "Camera/CameraComponent.h"
@@ -12,7 +13,6 @@ AVehicleBase::AVehicleBase()
 
     Chassis = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Chassis"));
     RootComponent = Chassis;
-    Chassis->SetRelativeLocation(FVector(0.f, 0.f, +100.f));
 
     static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkeletalMeshAsset(TEXT("/Game/Vehicles/Porsche_911_GT3_R/SK_Porsche_911_GT3-R.SK_Porsche_911_GT3-R"));
     if (SkeletalMeshAsset.Succeeded())
@@ -29,7 +29,7 @@ AVehicleBase::AVehicleBase()
     Chassis->SetEnableGravity(true);
     Chassis->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
     Chassis->SetCollisionObjectType(ECC_PhysicsBody);
-    Chassis->SetCollisionResponseToAllChannels(ECR_Block);
+    Chassis->SetGenerateOverlapEvents(true);
     Chassis->SetMassOverrideInKg(NAME_None, 1500.f, true);
     Chassis->SetCenterOfMass(FVector(0.f, 0.f, -50.f));
     Chassis->SetLinearDamping(0.5f);
@@ -134,6 +134,8 @@ void AVehicleBase::BeginPlay()
 {
     Super::BeginPlay();
     Chassis->SetSimulatePhysics(true);
+    Chassis->SetNotifyRigidBodyCollision(true);
+    Chassis->SetGenerateOverlapEvents(true);
     Chassis->WakeAllRigidBodies();
     SpringArm->SetWorldRotation(Chassis->GetComponentRotation());
     UE_LOG(LogTemp, Warning, TEXT("Chassis IsSimulatingPhysics: %s"), Chassis->IsSimulatingPhysics() ? TEXT("TRUE") : TEXT("FALSE"));

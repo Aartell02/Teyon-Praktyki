@@ -21,6 +21,10 @@ public:
     void ShowSettingsMenu();
     void SetFocus();
 
+private:
+    UPROPERTY()
+    UUserWidget* CurrentWidget;
+
 protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI")
     TSubclassOf<UUserWidget> MainMenuWidgetClass;
@@ -29,8 +33,4 @@ protected:
     TSubclassOf<UUserWidget> SettingsWidgetClass;
 
 
-
-private:
-    UPROPERTY()
-    UUserWidget* CurrentWidget;
 };

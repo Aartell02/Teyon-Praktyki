@@ -31,9 +31,9 @@ AVehicleBase::AVehicleBase()
     Chassis->SetCollisionObjectType(ECC_PhysicsBody);
     Chassis->SetGenerateOverlapEvents(true);
     Chassis->SetMassOverrideInKg(NAME_None, 1500.f, true);
-    Chassis->SetCenterOfMass(FVector(0.f, 0.f, -50.f));
-    Chassis->SetLinearDamping(0.5f);
-    Chassis->SetAngularDamping(0.9f);
+    Chassis->SetCenterOfMass(FVector(0.f, 0.f, -100.f));
+    Chassis->SetLinearDamping(1.5f);
+    Chassis->SetAngularDamping(2.f);
 
     UE_LOG(LogTemp, Warning, TEXT("Simulating physics is %s."), Chassis->IsSimulatingPhysics() ? TEXT("enabled") : TEXT("NOT enabled"));
 
@@ -46,20 +46,16 @@ AVehicleBase::AVehicleBase()
     SpringArm->CameraLagMaxDistance = 100.0f;
     SpringArm->bUsePawnControlRotation = false;
 
-    Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-    Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
-    Camera->bUsePawnControlRotation = false;
+    ChaseCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("ChaseCamera"));
+    ChaseCamera->SetupAttachment(SpringArm);
+    ChaseCamera->SetAutoActivate(true);
 
-    MovementInput = FVector::ZeroVector;
-    TurnInput = 0.f;
-    DriftFactor = 0.9f;
+    CockpitCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("CockpitCamera"));
+    CockpitCamera->SetupAttachment(RootComponent);
+    CockpitCamera->SetRelativeLocation(FVector(-20.f, -30.f, 95.f));
+    CockpitCamera->SetAutoActivate(false);
 
-    FL_Wheel_Turn = CreateDefaultSubobject<USceneComponent>(TEXT("FL_Wheel_Turn"));
-    FR_Wheel_Turn = CreateDefaultSubobject<USceneComponent>(TEXT("FR_Wheel_Turn"));
-
-    FL_Wheel_Turn->SetupAttachment(Chassis, TEXT("wheel_front_left_turn"));
-    FR_Wheel_Turn->SetupAttachment(Chassis, TEXT("wheel_front_right_turn"));
-
+    ActiveCamera = ChaseCamera;
 
 #define CREATE_AND_ATTACH(name, socket, path, root) \
     name = CreateDefaultSubobject<UStaticMeshComponent>(TEXT(#name)); \
@@ -112,21 +108,10 @@ AVehicleBase::AVehicleBase()
 
 #undef CREATE_AND_ATTACH
 
-        FR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
-        FR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
-        BR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
-        BR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
-
-}
-
-void AVehicleBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-    Super::SetupPlayerInputComponent(PlayerInputComponent);
-    PlayerInputComponent->BindAxis("Throttle", this, &AVehicleBase::Throttle);
-    PlayerInputComponent->BindAxis("Steer", this, &AVehicleBase::Steer);
-    PlayerInputComponent->BindAxis("Brake", this, &AVehicleBase::SetBrake);
-    PlayerInputComponent->BindAction("Handbrake", IE_Pressed, this, &AVehicleBase::ActivateHandbrake);
-    PlayerInputComponent->BindAction("Handbrake", IE_Released, this, &AVehicleBase::ReleaseHandbrake);
+    FR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+    FR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+    BR_Brake_Disc->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
+    BR_Wheel->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));
 
 }
 
@@ -146,31 +131,68 @@ void AVehicleBase::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    if (Chassis && Chassis->IsSimulatingPhysics())
+    if (bInputBlocked || !Chassis || !Chassis->IsSimulatingPhysics())
+        return;
+
+    if (FMath::Abs(TurnInput) < 0.01f)
+        TurnInput = 0.f;
+
+    if (!FMath::IsNearlyZero(MovementInput.X))
     {
-        if (!FMath::IsNearlyZero(MovementInput.X))
-        {
-            FVector Force = Chassis->GetForwardVector() * MovementInput.X * ThrottleForceStrength;
-            Chassis->AddForce(Force);
-        }
-        if (FMath::IsNearlyZero(TurnInput, 0.01f)) // a new raw input we will store from Steer(float)
-        {
-            TurnInput = FMath::FInterpTo(TurnInput, 0.0f, DeltaTime, SteeringReturnSpeed);
-            CurrentSteeringAngle = FMath::FInterpTo(CurrentSteeringAngle, 0.0f, DeltaTime, 5.0f); // smooth return
-        }
-        if (FMath::Abs(TurnInput) > KINDA_SMALL_NUMBER)
-        {
-            CurrentSteeringAngle = FMath::Clamp(DeltaTime, -1.0f, 1.0f) * MaxSteeringAngle;
-
-            FVector Torque = FVector(0.f, 0.f, TurnInput * SteeringTorqueStrength);
-            Chassis->AddTorqueInRadians(Torque);
-        }
-
-
-        ApplyFriction();
-        ApplyBrakeForce();
+        FVector Forward = Chassis->GetForwardVector();
+        Chassis->AddForce(Forward * MovementInput.X * ThrottleForceStrength);
     }
+
+    FVector Velocity = Chassis->GetPhysicsLinearVelocity();
+    FVector ForwardDir = Chassis->GetForwardVector();
+    FVector RightDir = Chassis->GetRightVector();
+
+    float fwdSpeed = FVector::DotProduct(Velocity, ForwardDir);
+    float sideSpeed = FVector::DotProduct(Velocity, RightDir);
+
+    const float DownforceStrength = 200.f;
+    FVector Downforce = FVector(0.f, 0.f, -1.f) * DownforceStrength * FMath::Abs(fwdSpeed);
+    Chassis->AddForce(Downforce);
+
+    const float SpeedAtMaxSteering = 1500.f;
+    float SpeedFactor = FMath::Clamp(FMath::Abs(fwdSpeed) / SpeedAtMaxSteering, 0.f, 1.f);
+    float AdjustedSteeringSpeed = SteeringAngleSpeed * SpeedFactor;
+
+    if (TurnInput != 0.f)
+    {
+        float TorqueStrength = TurnInput * AdjustedSteeringSpeed * SteeringTorqueStrength;
+        FVector Torque = FVector(0.f, 0.f, TorqueStrength);
+        Chassis->AddTorqueInRadians(Torque);
+
+        float TargetSideSpeed = sideSpeed * (1.f - 0.3f);
+        sideSpeed = FMath::FInterpTo(sideSpeed, TargetSideSpeed, DeltaTime, 5.f);
+
+        FVector newVel = ForwardDir * fwdSpeed + RightDir * sideSpeed;
+        Chassis->SetPhysicsLinearVelocity(newVel);
+    }
+    else
+    {
+        float TargetSideSpeed = sideSpeed * DriftFactor;
+        sideSpeed = FMath::FInterpTo(sideSpeed, TargetSideSpeed, DeltaTime, DriftRecoverSpeed);
+
+        FVector newVel = ForwardDir * fwdSpeed + RightDir * sideSpeed;
+        Chassis->SetPhysicsLinearVelocity(newVel);
+
+        FRotator currentRot = Chassis->GetComponentRotation();
+        FRotator targetRot = ForwardDir.Rotation();
+        FRotator smoothRot = FMath::RInterpTo(currentRot, targetRot, DeltaTime, 3.f);
+
+        FVector currentAngularVelocity = Chassis->GetPhysicsAngularVelocityInDegrees();
+        FVector desiredAngularVelocity = FVector(0.f, 0.f, (smoothRot.Yaw - currentRot.Yaw) * 10.f); 
+
+        FVector newAngularVelocity = FMath::VInterpTo(currentAngularVelocity, desiredAngularVelocity, DeltaTime, 5.f);
+        Chassis->SetPhysicsAngularVelocityInDegrees(newAngularVelocity);
+    }
+    UpdateSteeringWheel(DeltaTime);
+    ApplyFriction();
+    ApplyBrakeForce();
 }
+
 
 void AVehicleBase::Throttle(float Value)
 {
@@ -180,10 +202,6 @@ void AVehicleBase::Throttle(float Value)
 void AVehicleBase::Steer(float Value)
 {
     TurnInput = Value; 
-
-    float TargetAngle = FMath::Clamp(Value * MaxSteeringAngle, -MaxSteeringAngle, MaxSteeringAngle);
-
-    TurnInput = TargetAngle;
 }
 
 void AVehicleBase::SetBrake(float Value)
@@ -201,30 +219,58 @@ void AVehicleBase::ReleaseHandbrake()
     bHandbrake = false;
 }
 
+void AVehicleBase::SwitchCamera()
+{
+    if (!ChaseCamera || !CockpitCamera) return;
+
+    if (ActiveCamera == ChaseCamera)
+    {
+        ChaseCamera->Deactivate();
+
+        CockpitCamera->Activate();
+        ActiveCamera = CockpitCamera;
+    }
+    else
+    {
+        CockpitCamera->Deactivate();
+        ChaseCamera->Activate();
+        ActiveCamera = ChaseCamera;
+    }
+
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (PC) PC->SetViewTargetWithBlend(this, 0.5f);
+}
+void AVehicleBase::UpdateSteeringWheel(float DeltaTime)
+{
+    float InterpSpeed = 10.0f;
+    float TargetAngle = TurnInput * 120.f; 
+    float NewAngle = FMath::FInterpTo(CurrentSteeringAngle, TargetAngle, DeltaTime, InterpSpeed);
+
+    Steering_Wheel->SetRelativeRotation(FRotator(0.f, 0.f, NewAngle));
+
+    CurrentSteeringAngle = FMath::FInterpTo(CurrentSteeringAngle, TargetAngle, DeltaTime, InterpSpeed);
+}
+
 void AVehicleBase::ApplyFriction()
 {
     const float FrictionCoef = 1.0f;
     const float CorneringStiffness = 80000.0f;
     const float VelocityThreshold = 5.0f;
     const float GravityCm = 980.0f;
-
     float Mass = Chassis->GetMass();
     FVector Velocity = Chassis->GetPhysicsLinearVelocity();
     float Speed = Velocity.Size();
     if (Speed < VelocityThreshold) return;
 
-    // --- Chassis orientation ---
     FVector Forward = Chassis->GetForwardVector();
     FVector Right = Chassis->GetRightVector();
     FVector Up = Chassis->GetUpVector();
 
-    // --- Rotate by current steering angle to get front wheel direction ---
     float SteeringRad = FMath::DegreesToRadians(CurrentSteeringAngle);
     FQuat SteerRotation = FQuat(Up, SteeringRad);
     FVector FrontWheelForward = SteerRotation * Forward;
     FVector FrontWheelRight = SteerRotation * Right;
 
-    // --- Velocity at front axle ---
     FVector FrontAxleLocation = Chassis->GetComponentLocation() + Forward * FrontAxleOffset;
     FVector VelocityAtFront = Chassis->GetPhysicsLinearVelocityAtPoint(FrontAxleLocation);
 
@@ -249,7 +295,7 @@ void AVehicleBase::ApplyFriction()
         Chassis->AddForceAtLocation(LateralForce, FrontAxleLocation);
     }
     FVector AngularVel = Chassis->GetPhysicsAngularVelocityInDegrees();
-    FVector AngularDamp = -AngularVel * 0.2f; // Dampen 20% per frame
+    FVector AngularDamp = -AngularVel * 0.4f;
     Chassis->AddTorqueInDegrees(AngularDamp * Chassis->GetMass());
 }
 

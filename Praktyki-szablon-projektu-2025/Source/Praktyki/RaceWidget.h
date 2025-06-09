@@ -9,6 +9,8 @@
 /**
  * 
  */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRaceFinished);
+
 UCLASS()
 class PRAKTYKI_API URaceWidget : public UUserWidget
 {
@@ -22,11 +24,18 @@ public:
     int32 GetNumberOfLaps();
     int32 GetCurrentLap();
 
+
+    UPROPERTY(BlueprintAssignable, Category = "Race")
+    FOnRaceFinished OnRaceFinished;
+
 protected:
     UPROPERTY(meta = (BindWidget))
     class UTextBlock* TextBlock_Timer;
 
     UPROPERTY(meta = (BindWidget))
     class UTextBlock* TextBlock_LapCounter;
+
+    UPROPERTY()
+    bool bRaceFinishedBroadcasted = false;
 
 };

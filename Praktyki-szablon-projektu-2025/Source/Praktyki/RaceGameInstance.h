@@ -16,12 +16,9 @@ class PRAKTYKI_API URaceGameInstance : public UGameInstance
 
 public:
 
-
     int32 GetNumberOfLaps();
     void SetNumberOfLaps(int32 Number);
 
     UPROPERTY(BlueprintReadWrite, EditAnywhere)
     int32 NumberOfLaps = 3;
-
-    
 };

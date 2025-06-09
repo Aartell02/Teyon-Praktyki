@@ -6,13 +6,14 @@
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "RaceGameInstance.h"
+#include "Kismet/GameplayStatics.h"
 
 void USettingsWidget::NativeConstruct()
 {
     Super::NativeConstruct();                 
 
-    if (ApplyButton)
-        ApplyButton->OnClicked.AddDynamic(this, &USettingsWidget::OnApplyClicked);
+    if (StartButton)
+        StartButton->OnClicked.AddDynamic(this, &USettingsWidget::OnStartClicked);
 
     if (BackButton)
         BackButton->OnClicked.AddDynamic(this, &USettingsWidget::OnBackClicked);
@@ -20,14 +21,20 @@ void USettingsWidget::NativeConstruct()
     LapsTextBox->SetText(FText::AsNumber(GetNumberOfLaps()));
 
 }
-void USettingsWidget::OnApplyClicked()
+void USettingsWidget::OnStartClicked()
 {
     const FString Text = LapsTextBox->GetText().ToString();
     const int32 LapsValue = FCString::Atoi(*Text);
 
     SetNumberOfLaps(LapsValue);
 
-    OnBackClicked();
+    if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+    {
+        FInputModeGameOnly InputMode;
+        PC->SetInputMode(InputMode);
+        PC->bShowMouseCursor = false;
+    }
+    UGameplayStatics::OpenLevel(this, FName("TestMap"));
 }
 void USettingsWidget::OnBackClicked()
 {
@@ -43,7 +50,7 @@ void USettingsWidget::SetNumberOfLaps(int32 Number)
     {
         if (URaceGameInstance* MyGI = Cast<URaceGameInstance>(GI))
         {
-            MyGI->NumberOfLaps = Number;
+            MyGI->NumberOfLaps = Number < 1 ? 1: Number;
             UE_LOG(LogTemp, Warning, TEXT("Laps set to: %i"), Number);
         }
     }

@@ -71,7 +71,7 @@ void AMainMenuHUD::ShowSettingsMenu()
     }
 }
 void AMainMenuHUD::SetFocus() {
-    APlayerController* PC = GetOwningPlayerController(); // or GetWorld()->GetFirstPlayerController()
+    APlayerController* PC = GetOwningPlayerController();
 
     if (PC)
     {

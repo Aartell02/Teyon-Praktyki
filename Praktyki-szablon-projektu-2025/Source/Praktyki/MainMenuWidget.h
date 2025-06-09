@@ -19,10 +19,7 @@ public:
 	virtual void NativeConstruct()override;
 
 	UFUNCTION()
-	void OnStartGameClicked();
-
-    UFUNCTION()
-    void OnSettingsClicked();
+	void OnPlayGameClicked();
 
     void SetMenuHUD(AMainMenuHUD* InHUD)
     {
@@ -35,10 +32,7 @@ public:
 protected:
 
     UPROPERTY(meta = (BindWidget))
-    class UButton* StartGameButton;
-
-    UPROPERTY(meta = (BindWidget))
-    class UButton* SettingsButton;
+    class UButton* PlayGameButton;
 
     UPROPERTY(meta = (BindWidget))
     class UButton* QuitButton;

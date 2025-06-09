@@ -16,11 +16,33 @@ class PRAKTYKI_API AVehicleHUD : public AHUD
 
 public:
     AVehicleHUD();
+
+    UFUNCTION()
+    void ShowCountdownAndBlockInput();
+
+    UFUNCTION()
+    void ShowSummaryAndBlockInput();
+
+    UFUNCTION()
+    void UnblockInput();
+
     virtual void BeginPlay() override;
 
-private:
-
 protected:
+    UPROPERTY()
+    APawn* OwningPawn;
+
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UUserWidget> SummaryWidgetClass;
+
+    UPROPERTY()
+    UUserWidget* SummaryWidgetInstance;
+
+    UPROPERTY(EditAnywhere, Category = "UI")
+    TSubclassOf<UUserWidget> CountdownWidgetClass;
+
+    UPROPERTY()
+    UUserWidget* CountdownWidgetInstance;
 
     UPROPERTY(EditAnywhere, Category = "UI")
     TSubclassOf<UUserWidget> WidgetClass;

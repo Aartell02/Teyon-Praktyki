@@ -14,10 +14,15 @@ void URaceWidget::NativeConstruct()
 void URaceWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
-
     if (APraktykiGameModeBase* GM = GetWorld()->GetAuthGameMode<APraktykiGameModeBase>())
     {
         FPlayerRaceData Data = GM->GetRaceData();
+        if (Data.bFinished && !bRaceFinishedBroadcasted)
+        {
+            OnRaceFinished.Broadcast();
+            bRaceFinishedBroadcasted = true;
+            UE_LOG(LogTemp, Warning, TEXT("Race finished broadcast triggered."));
+        }
         int32 TotalSeconds = FMath::FloorToInt(Data.TotalRaceTime);
         int32 Minutes = TotalSeconds / 60;
         int32 Seconds = TotalSeconds % 60;
@@ -30,6 +35,7 @@ void URaceWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
         }
         FString LapsString = FString::Printf(TEXT("%d / %d"),GetCurrentLap(), GetNumberOfLaps());
         TextBlock_LapCounter->SetText(FText::FromString(LapsString));
+
     }
     
 }

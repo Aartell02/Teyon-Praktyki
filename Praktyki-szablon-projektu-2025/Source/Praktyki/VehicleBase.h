@@ -15,56 +15,54 @@ class PRAKTYKI_API AVehicleBase : public APawn
 	GENERATED_BODY()
 
 public:
-	// Sets default values for this pawn's properties
 	AVehicleBase();
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-    float CurrentSteeringAngle = 0.0f; // in degrees
-
-public:	
-	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	// Called to bind functionality to input
-    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-    // Input handlers
     void Throttle(float Value);
     void Steer(float Value);
-    void ApplyFriction();
-    void ApplyBrakeForce();
     void ReleaseHandbrake();
     void ActivateHandbrake();
+    void SwitchCamera();
+    void UpdateSteeringWheel(float DeltaTime);
+    void ApplyFriction();
+    void ApplyBrakeForce();
     void SetBrake(float DeltaTime);
 
-    
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     USpringArmComponent* SpringArm;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    UCameraComponent* Camera;
+    UPROPERTY(VisibleAnywhere)
+    UCameraComponent* ChaseCamera;
 
-    // Input
+    UPROPERTY(VisibleAnywhere)
+    UCameraComponent* CockpitCamera;
+
+    UCameraComponent* ActiveCamera;
+
     FVector MovementInput;
     float TurnInput;
-    float SteeringAngle = 0.0f;
-    float MaxSteeringAngle = 30.0f;
-    float SteeringReturnSpeed = 150.0f;
 
-    // Parametry fizyki
+    float SteeringAngleSpeed = 90.0f;
+    float CurrentSteeringAngle = 0.f;
+
+    UPROPERTY(BlueprintReadWrite)
+    bool bInputBlocked = false;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
-    float ThrottleForceStrength = 400000.f;
+    float ThrottleForceStrength = 600000.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
-    float SteeringTorqueStrength = 1000000.f;
+    float SteeringTorqueStrength = 350000.f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Physics")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
     float FrontAxleOffset = 100.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
-    float DriftFactor = 0.05f;
+    float DriftFactor = 0.1f;
+
+    UPROPERTY(EditAnywhere, Category = "Movement|Drift")
+    float DriftRecoverSpeed = 2.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Vehicle|Movement")
     float BrakeInput = 0.8f;  
@@ -107,12 +105,6 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle")
     UStaticMeshComponent* Steering_Wheel;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle|Wheels")
-    USceneComponent* FL_Wheel_Turn;
-
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle|Wheels")
-    USceneComponent* FR_Wheel_Turn;
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle")
     UStaticMeshComponent* FL_Wheel;
@@ -173,5 +165,8 @@ public:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Vehicle")
     UStaticMeshComponent* R_Wing_Mirror;
+
+protected:
+        virtual void BeginPlay() override;
 
 };

@@ -24,6 +24,9 @@ struct FPlayerRaceData
     float TotalRaceTime = 0.0f;
 
     UPROPERTY(BlueprintReadOnly)
+    bool bStarted = false;
+
+    UPROPERTY(BlueprintReadOnly)
     bool bFinished = false;
 };
 
@@ -39,6 +42,10 @@ public:
     virtual void Tick(float DeltaSeconds) override;
 
     void OnPlayerHitCheckpoint(int32 CheckpointIndex);
+    
+    void StartRace();
+    void FinishRace();
+    void ResetRace();
 
     const FPlayerRaceData& GetRaceData() const;
 

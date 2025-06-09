@@ -19,7 +19,7 @@ public:
 	virtual void NativeConstruct()override;
 
 	UFUNCTION()
-	void OnApplyClicked();
+	void OnStartClicked();
 
 	UFUNCTION()
 	void OnBackClicked();
@@ -34,7 +34,7 @@ public:
 protected:
 
 	UPROPERTY(meta = (BindWidget))
-	class UButton* ApplyButton;
+	class UButton* StartButton;
 
 	UPROPERTY(meta = (BindWidget))
 	class UButton* BackButton;

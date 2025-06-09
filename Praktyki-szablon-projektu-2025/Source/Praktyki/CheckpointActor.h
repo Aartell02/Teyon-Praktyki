@@ -14,6 +14,18 @@ class PRAKTYKI_API ACheckpointActor : public AActor
 
 public:
     ACheckpointActor();
+    UPROPERTY(EditAnywhere)
+    int32 CheckpointIndex = 0;
+
+    UFUNCTION()
+    void UpdateVisibility(bool bIsNext);
+private:
+
+    UPROPERTY(VisibleAnywhere, Category = "Checkpoint")
+    class UBoxComponent* TriggerVolume;
+
+    UPROPERTY(VisibleAnywhere)
+    class UStaticMeshComponent* VisualMesh;
 
 protected:
     virtual void BeginPlay() override;
@@ -23,11 +35,5 @@ protected:
         UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
         bool bFromSweep, const FHitResult& SweepResult);
 
-public:
-    UPROPERTY(EditAnywhere)
-    int32 CheckpointIndex = 0;
 
-private:
-    UPROPERTY(VisibleAnywhere)
-    class UBoxComponent* TriggerVolume;
 };

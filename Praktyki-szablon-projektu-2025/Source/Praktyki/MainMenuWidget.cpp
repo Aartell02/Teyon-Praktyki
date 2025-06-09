@@ -12,36 +12,20 @@ void UMainMenuWidget::NativeConstruct()
 {
     Super::NativeConstruct();                     
 
-    if (StartGameButton)
-        StartGameButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnStartGameClicked);
-
-    if (SettingsButton)
-        SettingsButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnSettingsClicked);
+    if (PlayGameButton)
+        PlayGameButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnPlayGameClicked);
 
     if (QuitButton)
         QuitButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnQuitClicked);
 }
 
-void UMainMenuWidget::OnStartGameClicked()
-{
-
-    if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-    {
-        FInputModeGameOnly InputMode;
-        PC->SetInputMode(InputMode);
-        PC->bShowMouseCursor = false;
-    }
-    UGameplayStatics::OpenLevel(this, FName("TestMap"));
-}
-
-void UMainMenuWidget::OnSettingsClicked()
+void UMainMenuWidget::OnPlayGameClicked()
 {
     if (!MenuHUD) return;
-
     RemoveFromParent();
-
     MenuHUD->ShowSettingsMenu();
 }
+
 
 void UMainMenuWidget::OnQuitClicked()
 {
